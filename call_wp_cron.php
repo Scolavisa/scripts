@@ -35,12 +35,38 @@ $log->info("found " . count($dirlist) . " directory entries");
 foreach ($dirlist as $dir) {
     if ($dir !== '.' && $dir !== '..' & is_dir("$wpsitesDir/$dir")) {
         // can i find a wp_cron in there? then call it
-        if (file_exists("$wpsitesDir/$dir/wp-cron.php")) {
-            exec("php $wpsitesDir/$dir/wp-cron.php", $output, $code);
-            if($code === 0) {
-                $log->info("$wpsitesDir/$dir successfully called");
+        if (file_exists("$wpsitesDir/$dir/wp-config.php")) {
+            // get frontpage URL
+            // get DB_NAME from wp_config
+            $dbName = findDbName("$wpsitesDir/$dir/wp-config.php");
+            $log->info("$wpsitesDir/$dir uses database: $dbName");
+            // Get homepage URL
+            // mysql> select option_value from wp_options where option_name='home';
+            $mysqli = new mysqli("localhost",$_ENV['UN'],$_ENV['PW'],$dbName);
+            if ($mysqli->connect_errno) {
+                $log->error("Failed to connect to $dbName");
+                // try the next entry
+                continue;
+            }
+            // call homepage URL using cUrl
+            $sql = "SELECT option_value FROM wp_options WHERE option_name='home'";
+            $result = $mysqli->query($sql);
+            $row = $result -> fetch_assoc();
+            $homeUrl = $row["option_value"];
+            $log->info("HomeURL $homeUrl");
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $homeUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            $output = curl_exec($ch);
+            $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            echo "status: $status \n";
+            if(intval($status) === 200) {
+                $log->info("$homeUrl successfully called");
             } else {
-                $log->error("tried to call wp-cron in $wpsitesDir/$dir but response was: $code");
+                $log->error("tried to call $homeUrl but response was: $status");
+                $log->error("first characters in response: " . substr($output, 0, 30));
             }
         } else {
             $log->warning("$wpsitesDir/$dir doesn't appear to be a WP site");
@@ -48,3 +74,23 @@ foreach ($dirlist as $dir) {
     }
 }
 
+function findDbName($filename) {
+    $result = '';
+    $handle = fopen($filename, "r");
+    if ($handle) {
+        while (($line = fgets($handle)) !== false) {
+            if (strpos($line, "define('DB_NAME'")!==false) {
+                $parts = explode(',', $line);
+                $result = trim($parts[1]);
+                // remove all whitespace and control characters
+                $result = preg_replace('/[ \t]+/', ' ', preg_replace('/\s*$^\s*/m', "\n", $result));
+                $result = substr($result, 1, strlen($result)-4);
+                break;
+            }
+        }
+    } else {
+        echo 'error opening the file';
+    }
+    fclose($handle);
+    return $result;
+}

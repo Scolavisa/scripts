@@ -1,3 +1,5 @@
 /.env
 /*.log
 /vendor/
+/wp-config.php
+/wp-settings.php

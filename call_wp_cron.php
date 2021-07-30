@@ -51,13 +51,18 @@ foreach ($dirlist as $dir) {
             // mysql> select option_value from wp_options where option_name='home';
             $mysqli = new mysqli("localhost",$_ENV['UN'],$_ENV['PW'],$dbName);
             if ($mysqli->connect_errno) {
-                $errorMessages[] = "Failed to connect to $dbName";
+                $errorMessages[] = "Failed to connect to $dbName (error $mysqli->connect_errno)";
                 continue;
             }
             // call homepage URL using cUrl
             $sql = "SELECT option_value FROM wp_options WHERE option_name='home'";
             $result = $mysqli->query($sql);
-            $row = $result->fetch_assoc();
+            try {
+                $row = $result->fetch_assoc();
+            } catch (Exception $e) {
+                $errorMessages[] = "Error getting home url from table wp_options for $dir";
+                continue;
+            }
             $homeUrl = $row["option_value"];
             $log->info("HomeURL $homeUrl");
             $ch = curl_init();
@@ -96,6 +101,9 @@ function findDbName($filename) {
                 // remove all whitespace and control characters
                 $result = preg_replace('/[ \t]+/', ' ', preg_replace('/\s*$^\s*/m', "\n", $result));
                 $result = substr($result, 1, strlen($result)-4);
+                $result = str_replace("'", "", $result);
+                $result = str_replace('"', "", $result);
+
                 break;
             }
         }

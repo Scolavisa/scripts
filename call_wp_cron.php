@@ -55,7 +55,8 @@ foreach ($dirlist as $dir) {
                 continue;
             }
             // call homepage URL using cUrl
-            $sql = "SELECT option_value FROM wp_options WHERE option_name='home'";
+            $optionsTable = getOptionsTabeleName("$wpsitesDir/$dir/wp-config.php");
+            $sql = "SELECT option_value FROM $optionsTable WHERE option_name='home'";
             $result = $mysqli->query($sql);
             try {
                 $row = $result->fetch_assoc();
@@ -89,26 +90,64 @@ foreach ($errorMessages as $errorMessage) {
     $log->error("Can't determine databasename for $errorMessage");
 }
 
-
+/**
+ * Determine the DB_NAME as defined in $filename
+ * @param $filename
+ * @return array|string|string[]
+ */
 function findDbName($filename) {
+    $result = '';
+    $line = findLineBySearchkey($filename, "DB_NAME");
+    if($line !== '') {
+        $parts = explode(',', $line);
+        $result = trim($parts[1]);
+        // remove all whitespace and control characters
+        $result = preg_replace('/[ \t]+/', ' ', preg_replace('/\s*\$\^\s*/m', "\n", $result));
+        $result = substr($result, 1, strlen($result) - 4);
+        $result = str_replace("'", "", $result);
+        $result = str_replace('"', "", $result);
+    }
+    return $result;
+}
+
+// look for $table_prefix = 'mmm___'; usa: $table_prefix  = 'wp_';
+// return actual options table name, like: mmm___options or wp_options
+
+/**
+ * Determine the name of the options table, taking the prefix into account
+ * @param String $filename
+ * @return String
+ */
+function getOptionsTabeleName(String $filename): String {
+    $result = '';
+    $line = findLineBySearchkey($filename, "table_prefix");
+    if ($line !== '') {
+        $parts = explode("=", $line);
+        $result = trim($parts[1]);
+        $result = substr($result, 1, strlen($result) - 2) . "options";
+        $result = str_replace("'", "", $result);
+        $result = str_replace('"', "", $result);
+    }
+    return $result;
+}
+
+/**
+ * Look for a line in a file containing a specific search key
+ * @param String $filename
+ * @param String $key
+ * @return string (not found returns empty string)
+ */
+function findLineBySearchkey(String $filename, String $key):string {
     $result = '';
     $handle = fopen($filename, "r");
     if ($handle) {
         while (($line = fgets($handle)) !== false) {
-            if (strpos($line, "'DB_NAME'")!==false) {
-                $parts = explode(',', $line);
-                $result = trim($parts[1]);
-                // remove all whitespace and control characters
-                $result = preg_replace('/[ \t]+/', ' ', preg_replace('/\s*$^\s*/m', "\n", $result));
-                $result = substr($result, 1, strlen($result)-4);
-                $result = str_replace("'", "", $result);
-                $result = str_replace('"', "", $result);
+            if (strpos($line, $key) !== false) {
+                $result = $line;
                 break;
             }
         }
-    } else {
-        echo 'error opening the file';
+        fclose($handle);
     }
-    fclose($handle);
     return $result;
 }

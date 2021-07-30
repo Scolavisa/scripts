@@ -2,6 +2,7 @@
     "require": {
         "vlucas/phpdotenv": "^5.3",
         "monolog/monolog": "^2.3",
-        "ext-curl": "*"
+        "ext-curl": "*",
+        "ext-mysqli": "*"
     }
 }

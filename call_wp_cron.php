@@ -29,6 +29,9 @@ $log->pushHandler($streamHandler);
 $log->info("---------------------------------");
 $log->info("analysing directory: $wpsitesDir");
 
+// collect errors in array, to be shown at the end of the log
+$errorMessages = [];
+
 // get all wordpress sites
 $dirlist = scandir($wpsitesDir);
 $log->info("found " . count($dirlist) . " directory entries");
@@ -39,19 +42,22 @@ foreach ($dirlist as $dir) {
             // get frontpage URL
             // get DB_NAME from wp_config
             $dbName = findDbName("$wpsitesDir/$dir/wp-config.php");
+            if (empty($dbName)) {
+                $errorMessages[] = "Can't determine databasename for $dir";
+                continue;
+            }
             $log->info("$wpsitesDir/$dir uses database: $dbName");
             // Get homepage URL
             // mysql> select option_value from wp_options where option_name='home';
             $mysqli = new mysqli("localhost",$_ENV['UN'],$_ENV['PW'],$dbName);
             if ($mysqli->connect_errno) {
-                $log->error("Failed to connect to $dbName");
-                // try the next entry
+                $errorMessages[] = "Failed to connect to $dbName";
                 continue;
             }
             // call homepage URL using cUrl
             $sql = "SELECT option_value FROM wp_options WHERE option_name='home'";
             $result = $mysqli->query($sql);
-            $row = $result -> fetch_assoc();
+            $row = $result->fetch_assoc();
             $homeUrl = $row["option_value"];
             $log->info("HomeURL $homeUrl");
             $ch = curl_init();
@@ -60,19 +66,24 @@ foreach ($dirlist as $dir) {
             $output = curl_exec($ch);
             $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-
-            echo "status: $status \n";
+            // result
             if(intval($status) === 200) {
                 $log->info("$homeUrl successfully called");
             } else {
-                $log->error("tried to call $homeUrl but response was: $status");
-                $log->error("first characters in response: " . substr($output, 0, 30));
+                $errorMessages[] = "tried to call $homeUrl but response was: $status";
+                $errorMessages[] = "first characters in response: " . substr($output, 0, 30);
             }
         } else {
             $log->warning("$wpsitesDir/$dir doesn't appear to be a WP site");
         }
     }
 }
+
+// Show all errors in summary
+foreach ($errorMessages as $errorMessage) {
+    $log->error("Can't determine databasename for $errorMessage");
+}
+
 
 function findDbName($filename) {
     $result = '';

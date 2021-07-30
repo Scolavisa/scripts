@@ -95,7 +95,7 @@ function findDbName($filename) {
     $handle = fopen($filename, "r");
     if ($handle) {
         while (($line = fgets($handle)) !== false) {
-            if (strpos($line, "define('DB_NAME'")!==false) {
+            if (strpos($line, "'DB_NAME'")!==false) {
                 $parts = explode(',', $line);
                 $result = trim($parts[1]);
                 // remove all whitespace and control characters
@@ -103,7 +103,6 @@ function findDbName($filename) {
                 $result = substr($result, 1, strlen($result)-4);
                 $result = str_replace("'", "", $result);
                 $result = str_replace('"', "", $result);
-
                 break;
             }
         }

@@ -68,6 +68,7 @@ foreach ($dirlist as $dir) {
             $log->info("HomeURL $homeUrl");
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $homeUrl);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             $output = curl_exec($ch);
             $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -87,7 +88,7 @@ foreach ($dirlist as $dir) {
 
 // Show all errors in summary
 foreach ($errorMessages as $errorMessage) {
-    $log->error("Can't determine databasename for $errorMessage");
+    $log->error($errorMessage);
 }
 
 /**
